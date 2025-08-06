@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +24,22 @@ class _ChatPageState extends State<ChatPage> {
   final ChatService _chatService = ChatService();
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
+  @override
+  void initState() {
+    super.initState();
+
+    // baue die Chatroom-ID korrekt zusammen
+    List<String> ids = [widget.receiverUserID, _firebaseAuth.currentUser!.uid];
+    ids.sort();
+    String chatRoomId = ids.join("_");
+
+    // markiere Nachrichten als gelesen
+    markMessagesAsRead(chatRoomId);
+  }
+
+
+
+
   void sendMessage() async {
     // only send message if it's not empty
     if (_messageController.text.isNotEmpty) {
@@ -37,8 +51,38 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void markMessagesAsRead(String chatRoomId) {
+    print(
+      "markMessagesAsRead called for chatRoomId: $chatRoomId",
+    ); // Debug-Ausgabe
+    final currentUserId = FirebaseAuth.instance.currentUser!.uid;
+    FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(chatRoomId)
+        .collection('messages')
+        .where('receiverId', isEqualTo: currentUserId)
+        .where('isRead', isEqualTo: false)
+        .get()
+        .then((snapshot) {
+          for (var doc in snapshot.docs) {
+            doc.reference.update({'isRead': true});
+          }
+        });
+  }
+
+
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      List<String> ids = [
+        widget.receiverUserID,
+        _firebaseAuth.currentUser!.uid,
+      ];
+      ids.sort();
+      String chatRoomId = ids.join("_");
+      markMessagesAsRead(chatRoomId);
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.receiverUserEmail),

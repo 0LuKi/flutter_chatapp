@@ -4,10 +4,14 @@ import 'package:flutter_chatapp/firebase_options.dart';
 import 'package:flutter_chatapp/services/auth/auth_gate.dart';
 import 'package:flutter_chatapp/services/auth/auth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_chatapp/services/message/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await PushNotificationService.initialize();
+
   runApp(
     ChangeNotifierProvider(
       create: (context) => AuthService(),

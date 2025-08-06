@@ -21,7 +21,9 @@ class ChatService extends ChangeNotifier {
       senderEmail: currentUserEmail, 
       receiverId: receiverId, 
       message: message, 
-      timestamp: timestamp);
+      timestamp: timestamp,
+      isRead: false, // default to false when sending a new message
+      );
 
 
     // construct chat room id from current user id and receiver id (sorted to ensure unique chat room)

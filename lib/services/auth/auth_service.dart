@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 
 class AuthService extends ChangeNotifier {
   //instance of auth
@@ -27,6 +29,9 @@ class AuthService extends ChangeNotifier {
       } catch (e) {
         print("Firestore error: $e");
       }
+
+      // Token speichern
+      await _saveDeviceToken(userCredential.user!.uid);
 
       return userCredential;
 
@@ -55,6 +60,9 @@ class AuthService extends ChangeNotifier {
         'createdAt': Timestamp.now(),
       }, SetOptions(merge: true));
 
+      // Token speichern
+      await _saveDeviceToken(userCredential.user!.uid);
+
       return userCredential;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
@@ -70,4 +78,15 @@ class AuthService extends ChangeNotifier {
   Future<void> signOut() async {
     return await FirebaseAuth.instance.signOut();
   }
+
+  // get token for push notifications
+  Future<void> _saveDeviceToken(String userId) async {
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await _fireStore.collection('users').doc(userId).set({
+        'fcmToken': token,
+      }, SetOptions(merge: true));
+    }
+  }
+
 }

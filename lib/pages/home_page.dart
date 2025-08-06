@@ -179,74 +179,105 @@ class _HomePageState extends State<HomePage> {
   Widget _buildUserListItem(DocumentSnapshot document) {
     Map<String, dynamic> data = document.data()! as Map<String, dynamic>;
 
-    if (_auth.currentUser!.email != data['email']) {
-      return Card(
-        margin: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.blue.shade100,
-            child: Icon(Icons.person, color: Colors.blue.shade700),
-          ),
-          title: Text(
-            data['email'],
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700),
-          ),
-          subtitle: Text("User ID: ${data['uid']}"),
-          trailing: IconButton(
-            icon: Icon(Icons.delete, color: Colors.red),
-            tooltip: "Delete chat",
-            padding: EdgeInsets.zero, // Less padding
-            onPressed: () async {
-              // Confirm before deleting
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text("Delete Chat"),
-                  content: Text("Are you sure you want to delete this chat?"),
-                  actions: [
-                    TextButton(
-                      child: Text("Cancel"),
-                      onPressed: () => Navigator.of(context).pop(false),
+    if (_auth.currentUser!.email == data['email']) return SizedBox.shrink();
+
+    String otherUserId = data['uid'];
+    String currentUserId = _auth.currentUser!.uid;
+    List<String> ids = [currentUserId, otherUserId]..sort();
+    String chatRoomId = ids.join("_");
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: currentUserId)
+          .where('isRead', isEqualTo: false)
+          .where('senderId', isEqualTo: otherUserId)
+          .limit(1) // only need to know if *any* unread message exists
+          .snapshots(),
+      builder: (context, snapshot) {
+        bool hasUnread = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+        return Card(
+          margin: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.blue.shade100,
+              child: Icon(Icons.person, color: Colors.blue.shade700),
+            ),
+            title: Text(
+              data['email'],
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+            ),
+            subtitle: Text("User ID: ${data['uid']}"),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasUnread)
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
                     ),
-                    TextButton(
-                      child: Text("Delete", style: TextStyle(color: Colors.red)),
-                      onPressed: () => Navigator.of(context).pop(true),
-                    ),
-                  ],
+                  ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  tooltip: "Delete chat",
+                  padding: EdgeInsets.zero,
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text("Delete Chat"),
+                        content: Text("Are you sure you want to delete this chat?"),
+                        actions: [
+                          TextButton(
+                            child: Text("Cancel"),
+                            onPressed: () => Navigator.of(context).pop(false),
+                          ),
+                          TextButton(
+                            child: Text("Delete", style: TextStyle(color: Colors.red)),
+                            onPressed: () => Navigator.of(context).pop(true),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('chat_rooms')
+                            .doc(chatRoomId)
+                            .delete();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Chat deleted")),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Failed to delete chat: $e")),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatPage(
+                    receiverUserEmail: data['email'],
+                    receiverUserID: data['uid'],
+                  ),
                 ),
               );
-              if (confirm == true) {
-                List<String> ids = [_auth.currentUser!.uid, data['uid']];
-                ids.sort();
-                String chatRoomId = ids.join("_");
-                try {
-                  await FirebaseFirestore.instance.collection('chat_rooms').doc(chatRoomId).delete();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Chat deleted"))
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Failed to delete chat: $e"))
-                  );
-                }
-              }
             },
           ),
-          onTap: () {
-            Navigator.push(
-              context, MaterialPageRoute(
-                builder: (context) => ChatPage(
-                  receiverUserEmail: data['email'],
-                  receiverUserID: data['uid'],
-                ),
-              )
-            );
-          },
-        ),
-      );
-    }
-    else {
-      return SizedBox.shrink();
-    }
+        );
+      },
+    );
   }
 }
